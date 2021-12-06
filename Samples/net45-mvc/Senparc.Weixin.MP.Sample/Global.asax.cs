@@ -14,9 +14,9 @@ using Senparc.CO2NET.RegisterServices;
 using Senparc.CO2NET.Utilities;
 using Senparc.Weixin.Entities;
 using Senparc.Weixin.Exceptions;
-using Senparc.Weixin.MP.Sample.CommonService;
+using Senparc.Weixin.Sample.CommonService;
 //DPBMARK WebSocket
-using Senparc.Weixin.MP.Sample.CommonService.MessageHandlers.WebSocket;//DPBMARK_END
+using Senparc.Weixin.Sample.CommonService.MessageHandlers.WebSocket;//DPBMARK_END
 //DPBMARK Open
 using Senparc.Weixin.Open;
 using Senparc.Weixin.Open.ComponentAPIs;//DPBMARK_END
@@ -77,6 +77,9 @@ namespace Senparc.Weixin.MP.Sample
             IRegisterService register = RegisterService.Start(senparcSetting).UseSenparcGlobal();
 
             #region  全局缓存配置（按需）
+
+            //当同一个分布式缓存同时服务于多个网站（应用程序池）时，可以使用命名空间将其隔离（非必须）
+            register.ChangeDefaultCacheNamespace("DefaultCO2NETCache");
 
             #region 配置和使用 Redis          -- DPBMARK Redis
 
@@ -315,8 +318,8 @@ using Senparc.Weixin.Cache;
 using Senparc.Weixin.Cache.Memcached;
 using Senparc.Weixin.Cache.Redis;
 using Senparc.Weixin.MP.Containers;
-using Senparc.Weixin.MP.Sample.CommonService;
-using Senparc.Weixin.MP.Sample.CommonService.MessageHandlers.WebSocket;
+using Senparc.Weixin.Sample.CommonService;
+using Senparc.Weixin.Sample.CommonService.MessageHandlers.WebSocket;
 using Senparc.Weixin.Open.ComponentAPIs;
 using Senparc.Weixin.Open.Containers;
 using Senparc.Weixin.Threads;

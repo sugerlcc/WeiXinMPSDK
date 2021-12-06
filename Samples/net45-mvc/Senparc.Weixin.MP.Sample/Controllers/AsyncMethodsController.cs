@@ -7,11 +7,13 @@ using System.Threading.Tasks;
 using System.Web;
 using System.Web.Configuration;
 using System.Web.Mvc;
+using Senparc.CO2NET.Cache;
+using Senparc.CO2NET.Extensions;
 using Senparc.Weixin.MP.AdvancedAPIs;
 using Senparc.Weixin.MP.AdvancedAPIs.TemplateMessage;
 using Senparc.Weixin.MP.Helpers;
 using Senparc.Weixin.MP.MvcExtension;
-using Senparc.Weixin.MP.Sample.CommonService.CustomMessageHandler;
+using Senparc.Weixin.Sample.CommonService.CustomMessageHandler;
 
 namespace Senparc.Weixin.MP.Sample.Controllers
 {
@@ -47,18 +49,17 @@ namespace Senparc.Weixin.MP.Sample.Controllers
         /// <returns></returns>
         public async Task<ActionResult> TemplateMessageTest(string checkcode)
         {
-            var openId = CustomMessageHandler.TemplateMessageCollection.ContainsKey(checkcode)
-                ? CustomMessageHandler.TemplateMessageCollection[checkcode]
-                : null;
+            var currentCache = CacheStrategyFactory.GetObjectCacheStrategyInstance();
+            var cacheKey = $"TestCheckCode:{checkcode}";
+            var openId = await currentCache.GetAsync(cacheKey) as string;//使用缓存，如果多台服务器可以使用分布式缓存共享
 
-            if (openId == null)
+            if (openId.IsNullOrEmpty())
             {
                 return Content("验证码已过期或不存在！请在“盛派网络小助手”公众号输入“tm”获取验证码。");
             }
             else
             {
-                CustomMessageHandler.TemplateMessageCollection.Remove(checkcode);
-
+                await currentCache.RemoveFromCacheAsync(cacheKey);
 
                 var templateId = "cCh2CTTJIbVZkcycDF08n96FP-oBwyMVrro8C2nfVo4";
                 var testData = new //TestTemplateData()
@@ -70,7 +71,7 @@ namespace Senparc.Weixin.MP.Sample.Controllers
                     remark = new TemplateDataItem("更详细信息，请到Senparc.Weixin SDK官方网站（https://sdk.weixin.senparc.com）查看！\r\n\r\n这里我做了两个换行！\r\n\r\n点击详情可跳转到 BookHelper 小程序！")
                 };
 
-                var miniProgram = new TempleteModel_MiniProgram()
+                var miniProgram = new TemplateModel_MiniProgram()
                 {
                     appid = "wxfcb0a0031394a51c",//【盛派互动（BookHelper）】小程序
                     pagepath = "pages/index/index"
@@ -91,7 +92,7 @@ namespace Senparc.Weixin.MP.Sample.Controllers
         public ActionResult DeadLockTest()
         {
             var result =
-                Senparc.CO2NET.HttpUtility.RequestUtility.HttpGetAsync("https://sdk.weixin.senparc.com",
+                Senparc.CO2NET.HttpUtility.RequestUtility.HttpGetAsync(null, "https://sdk.weixin.senparc.com",
                     cookieContainer: null).Result;
             return Content(result);
         }
@@ -102,7 +103,7 @@ namespace Senparc.Weixin.MP.Sample.Controllers
         /// <returns></returns>
         public async Task<ActionResult> NoDeadLockTest()
         {
-            var result = await Senparc.CO2NET.HttpUtility.RequestUtility.HttpGetAsync("https://sdk.weixin.senparc.com",
+            var result = await Senparc.CO2NET.HttpUtility.RequestUtility.HttpGetAsync(null,"https://sdk.weixin.senparc.com",
                 cookieContainer: null);
             return Content(result);
         }

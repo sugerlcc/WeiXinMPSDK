@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2020 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2021 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ Detail: https://github.com/JeffreySu/WeiXinMPSDK/blob/master/license.md
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2020 Senparc
+    Copyright (C) 2021 Senparc
  
     文件名：TenPayV3.cs
     文件功能描述：微信支付V3接口
@@ -90,7 +90,10 @@ Detail: https://github.com/JeffreySu/WeiXinMPSDK/blob/master/license.md
 
     修改标识：Senparc - 20190521
     修改描述：v1.4.0 .NET Core 添加多证书注册功能
-    
+ 
+    修改标识：hesi815 - 20200318
+    修改描述：v1.5.401 实现分账接口，添加方法：MultiProfitSharing()、ProfitSharingFinish()、ProfitSharingAddReceiver()、ProfitSharingRemoveReceiver()、ProfitSharingQuery()
+
 ----------------------------------------------------------------*/
 
 /*
@@ -120,7 +123,7 @@ namespace Senparc.Weixin.TenPay.V3
     {
         #region 私有方法
 
-#if NET45
+#if NET451
         /// <summary>
         /// 带证书提交
         /// </summary>
@@ -140,7 +143,7 @@ namespace Senparc.Weixin.TenPay.V3
                 X509Certificate2 cer = new X509Certificate2(cert, certPassword, X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
 
                 string responseContent = RequestUtility.HttpPost(
-                    CommonDI.CommonSP, 
+                    CommonDI.CommonSP,
                     url,
                     postStream: ms,
                     cer: cer,
@@ -406,6 +409,7 @@ namespace Senparc.Weixin.TenPay.V3
             return new OrderQueryResult(resultXml);
         }
 
+
         /// <summary>
         /// 关闭订单接口
         /// </summary>
@@ -439,6 +443,171 @@ namespace Senparc.Weixin.TenPay.V3
             ms.Seek(0, SeekOrigin.Begin);//设置指针读取位置
             var resultXml = RequestUtility.HttpPost(CommonDI.CommonSP, urlFormat, null, ms);
             return new CloseOrderResult(resultXml);
+        }
+
+        /// <summary>
+        /// 单次分账接口
+        /// 服务商(单次分账): https://pay.weixin.qq.com/wiki/doc/api/allocation_sl.php?chapter=25_1&index=1
+        /// 境内普通商户(单次分账): https://pay.weixin.qq.com/wiki/doc/api/allocation.php?chapter=27_1&index=1
+        /// </summary>
+        /// <param name="dataInfo"></param>
+        /// <param name="cert">证书绝对路径，如@"F:\apiclient_cert.p12"</param> 
+        /// <param name="certPassword">证书密码</param>
+        /// <returns></returns>
+        public static ProfitSharingResult ProfitSharing
+            (
+            IServiceProvider serviceProvider, TenpayV3ProtfitSharingRequestData dataInfo,
+#if NET451
+           string cert, string certPassword,
+#endif
+            int timeOut = Config.TIME_OUT
+            )
+        {
+            var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/secapi/{0}pay/profitsharing");
+            var data = dataInfo.PackageRequestHandler.ParseXML();
+            //var dataBytes = Encoding.UTF8.GetBytes(data);
+            //using (MemoryStream ms = new MemoryStream(dataBytes))
+            //{
+            //调用证书
+#if NET451
+            string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
+#else
+            string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
+#endif
+            return new ProfitSharingResult(responseContent);
+        }
+
+
+        /// <summary>
+        /// 多次分账接口
+        /// 服务商(多次分账): https://pay.weixin.qq.com/wiki/doc/api/allocation_sl.php?chapter=25_6&index=2
+        /// 境内普通商户(多次分账): https://pay.weixin.qq.com/wiki/doc/api/allocation.php?chapter=27_6&index=2
+        /// </summary>
+        /// <param name="dataInfo"></param>
+        /// <param name="cert">证书绝对路径，如@"F:\apiclient_cert.p12"</param> 
+        /// <param name="certPassword">证书密码</param>
+        /// <returns></returns>
+        public static ProfitSharingResult MultiProfitSharing(
+            IServiceProvider serviceProvider, TenpayV3ProtfitSharingRequestData dataInfo,
+#if NET451
+            string cert, string certPassword,
+#endif
+            int timeOut = Config.TIME_OUT
+        )
+        {
+            var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/secapi/{0}pay/multiprofitsharing");
+            var data = dataInfo.PackageRequestHandler.ParseXML();
+            //var dataBytes = Encoding.UTF8.GetBytes(data);
+            //using (MemoryStream ms = new MemoryStream(dataBytes))
+            //{
+            //调用证书
+#if NET451
+            string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
+#else
+            string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
+#endif
+            return new ProfitSharingResult(responseContent);
+        }
+
+
+        /// <summary>
+        /// 完结分账
+        /// 服务商特约商户: https://pay.weixin.qq.com/wiki/doc/api/allocation_sl.php?chapter=25_5&index=6
+        /// 境内普通商户: https://pay.weixin.qq.com/wiki/doc/api/allocation.php?chapter=27_5&index=6
+        /// </summary>
+        /// <param name="dataInfo"></param>
+        /// <param name="timeOut"></param>
+        /// <returns></returns>
+        public static ProfitSharingResult ProfitSharingFinish(
+            IServiceProvider serviceProvider, TenpayV3ProtfitSharingFinishRequestData dataInfo,
+#if NET451
+            string cert, string certPassword,
+#endif
+            int timeOut = Config.TIME_OUT)
+        {
+            var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/secapi/{0}pay/profitsharingfinish");
+            var data = dataInfo.PackageRequestHandler.ParseXML();
+            //var dataBytes = Encoding.UTF8.GetBytes(data);
+            //using (MemoryStream ms = new MemoryStream(dataBytes))
+            //{
+            //调用证书
+#if NET451
+            string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
+#else
+            string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
+#endif
+            return new ProfitSharingResult(responseContent);
+        }
+
+        /// <summary>
+        /// 服务商代子商户发起添加分账接收方请求，
+        /// 后续可通过发起分账请求将结算后的钱分到该分账接收方
+        /// </summary>
+        /// <param name="dataInfo"></param>
+        /// <param name="timeOut"></param>
+        /// <returns></returns>
+        public static ProfitSharingAddReceiverResult ProfitSharingAddReceiver(TenpayV3ProfitShareingAddReceiverRequestData dataInfo,
+            int timeOut = Config.TIME_OUT)
+        {
+            var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/{0}pay/profitsharingaddreceiver");
+
+            var data = dataInfo.PackageRequestHandler.ParseXML();
+            MemoryStream ms = new MemoryStream();
+            var formDataBytes = data == null ? new byte[0] : Encoding.UTF8.GetBytes(data);
+            ms.Write(formDataBytes, 0, formDataBytes.Length);
+            ms.Seek(0, SeekOrigin.Begin);//设置指针读取位置
+            var resultXml = RequestUtility.HttpPost(CommonDI.CommonSP, urlFormat, null, ms, timeOut: timeOut);
+            // var resultXml = RequestUtility.HttpPost(urlFormat, null, ms, timeOut: timeOut);
+            return new ProfitSharingAddReceiverResult(resultXml);
+        }
+
+
+        /// <summary>
+        ///  删除分账接收方
+        /// 服务商特约商户: https://pay.weixin.qq.com/wiki/doc/api/allocation_sl.php?chapter=25_4&index=5
+        /// 境内普通商户: https://pay.weixin.qq.com/wiki/doc/api/allocation.php?chapter=27_4&index=5
+        /// </summary>
+        /// <param name="dataInfo"></param>
+        /// <param name="timeOut"></param>
+        /// <returns></returns>
+        public static ProfitSharingRemoveReceiverResult ProfitSharingRemoveReceiver(TenpayV3ProfitShareingRemoveReceiverRequestData dataInfo,
+            int timeOut = Config.TIME_OUT)
+        {
+            var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/{0}pay/profitsharingremovereceiver");
+
+            var data = dataInfo.PackageRequestHandler.ParseXML();
+            MemoryStream ms = new MemoryStream();
+            var formDataBytes = data == null ? new byte[0] : Encoding.UTF8.GetBytes(data);
+            ms.Write(formDataBytes, 0, formDataBytes.Length);
+            ms.Seek(0, SeekOrigin.Begin);//设置指针读取位置
+            var resultXml = RequestUtility.HttpPost(CommonDI.CommonSP, urlFormat, null, ms, timeOut: timeOut);
+            // var resultXml = RequestUtility.HttpPost(urlFormat, null, ms, timeOut: timeOut);
+            return new ProfitSharingRemoveReceiverResult(resultXml);
+        }
+
+
+
+        /// <summary>
+        /// 分账查询
+        /// 服务商特约商户: https://pay.weixin.qq.com/wiki/doc/api/allocation_sl.php?chapter=25_2&index=3
+        /// 境内普通商户: https://pay.weixin.qq.com/wiki/doc/api/allocation.php?chapter=27_2&index=3
+        /// </summary>
+        /// <param name="dataInfo"></param>
+        /// <param name="timeOut"></param>
+        /// <returns></returns>
+        public static ProfitSharingQueryResult ProfitSharingQuery(TenpayV3ProtfitSharingQueryRequestData dataInfo,
+            int timeOut = Config.TIME_OUT)
+        {
+            var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/{0}pay/profitsharingquery");
+
+            var data = dataInfo.PackageRequestHandler.ParseXML();
+            MemoryStream ms = new MemoryStream();
+            var formDataBytes = data == null ? new byte[0] : Encoding.UTF8.GetBytes(data);
+            ms.Write(formDataBytes, 0, formDataBytes.Length);
+            ms.Seek(0, SeekOrigin.Begin);//设置指针读取位置
+            var resultXml = RequestUtility.HttpPost(CommonDI.CommonSP, urlFormat, null, ms, timeOut: timeOut);
+            // var resultXml = RequestUtility.HttpPost(urlFormat, null, ms, timeOut: timeOut);
+            return new ProfitSharingQueryResult(resultXml);
         }
 
         /// <summary>
@@ -488,8 +657,8 @@ namespace Senparc.Weixin.TenPay.V3
         public static ReverseResult Reverse(
             IServiceProvider serviceProvider,
             TenPayV3ReverseRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
@@ -499,7 +668,7 @@ namespace Senparc.Weixin.TenPay.V3
             //using (MemoryStream ms = new MemoryStream(dataBytes))
             //{
             //调用证书
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
@@ -527,8 +696,8 @@ namespace Senparc.Weixin.TenPay.V3
         public static RefundResult Refund(
             IServiceProvider serviceProvider,
             TenPayV3RefundRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
@@ -546,7 +715,7 @@ namespace Senparc.Weixin.TenPay.V3
             using (MemoryStream ms = new MemoryStream(dataBytes))
             {
                 //调用证书
-#if NET45
+#if NET451
                 string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
                 string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
@@ -712,14 +881,14 @@ namespace Senparc.Weixin.TenPay.V3
         public static TransfersResult Transfers(
             IServiceProvider serviceProvider,
             TenPayV3TransfersRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
             var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/{0}mmpaymkttransfers/promotion/transfers");
             var data = dataInfo.PackageRequestHandler.ParseXML();
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
@@ -738,14 +907,14 @@ namespace Senparc.Weixin.TenPay.V3
         public static TransfersResult PayToWorker(
             IServiceProvider serviceProvider,
             TenPayV3PayToWorkerRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
             var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/paywwsptrans2pocket");
             var data = dataInfo.PackageRequestHandler.ParseXML();
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
@@ -782,8 +951,8 @@ namespace Senparc.Weixin.TenPay.V3
         public static GetTransferInfoResult GetTransferInfo(
             IServiceProvider serviceProvider,
             TenPayV3GetTransferInfoRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
@@ -791,7 +960,7 @@ namespace Senparc.Weixin.TenPay.V3
             var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/{0}mmpaymkttransfers/gettransferinfo");
 
             var data = dataInfo.PackageRequestHandler.ParseXML();
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
@@ -810,15 +979,15 @@ namespace Senparc.Weixin.TenPay.V3
         public static GetTransferInfoResult QueryPayLog(
             IServiceProvider serviceProvider,
             TenPayV3GetTransferInfoRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
             var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/querywwsptrans2pocket");
 
             var data = dataInfo.PackageRequestHandler.ParseXML();
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = CertPost_NetCore(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut);
@@ -847,7 +1016,6 @@ namespace Senparc.Weixin.TenPay.V3
         }
 
         #endregion
-
 
         #region 异步方法
 
@@ -948,8 +1116,8 @@ namespace Senparc.Weixin.TenPay.V3
         public static async Task<RefundResult> RefundAsync(
             IServiceProvider serviceProvider,
             TenPayV3RefundRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
@@ -962,7 +1130,7 @@ namespace Senparc.Weixin.TenPay.V3
             //本地或者服务器的证书位置（证书在微信支付申请成功发来的通知邮件中）
             //string cert = cert;// @"F:\apiclient_cert.p12";
             //私钥（在安装证书时设置）
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = await CertPost_NetCoreAsync(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut).ConfigureAwait(false);
@@ -1089,8 +1257,8 @@ namespace Senparc.Weixin.TenPay.V3
         public static async Task<ReverseResult> ReverseAsync(
             IServiceProvider serviceProvider,
             TenPayV3ReverseRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
@@ -1100,7 +1268,7 @@ namespace Senparc.Weixin.TenPay.V3
             //using (MemoryStream ms = new MemoryStream(dataBytes))
             //{
             //调用证书
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = await CertPost_NetCoreAsync(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut).ConfigureAwait(false);
@@ -1274,14 +1442,14 @@ namespace Senparc.Weixin.TenPay.V3
         public static async Task<TransfersResult> TransfersAsync(
             IServiceProvider serviceProvider,
             TenPayV3TransfersRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
             var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/{0}mmpaymkttransfers/promotion/transfers");
             var data = dataInfo.PackageRequestHandler.ParseXML();
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = await CertPost_NetCoreAsync(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut).ConfigureAwait(false);
@@ -1316,14 +1484,14 @@ namespace Senparc.Weixin.TenPay.V3
         public static async Task<GetTransferInfoResult> GetTransferInfoAsync(
             IServiceProvider serviceProvider,
             TenPayV3GetTransferInfoRequestData dataInfo,
-#if NET45
-            string cert, string certPassword, 
+#if NET451
+            string cert, string certPassword,
 #endif
             int timeOut = Config.TIME_OUT)
         {
             var urlFormat = ReurnPayApiUrl("https://api.mch.weixin.qq.com/{0}mmpaymkttransfers/gettransferinfo");
             var data = dataInfo.PackageRequestHandler.ParseXML();
-#if NET45
+#if NET451
             string responseContent = CertPost(cert, certPassword, data, urlFormat, timeOut);
 #else
             string responseContent = await CertPost_NetCoreAsync(serviceProvider, dataInfo.MchId, dataInfo.SubMchId, data, urlFormat, timeOut).ConfigureAwait(false);

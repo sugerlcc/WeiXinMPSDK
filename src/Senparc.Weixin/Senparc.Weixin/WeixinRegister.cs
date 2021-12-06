@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2020 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2021 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ Detail: https://github.com/JeffreySu/WeiXinMPSDK/blob/master/license.md
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2020 Senparc
+    Copyright (C) 2021 Senparc
 
     文件名：WeixinRegister.cs
     文件功能描述：Senparc.Weixin 快捷注册流程（包括Thread、TraceLog等）
@@ -59,19 +59,15 @@ Detail: https://github.com/JeffreySu/WeiXinMPSDK/blob/master/license.md
 
 ----------------------------------------------------------------*/
 
-#if NETSTANDARD2_0 || NETSTANDARD2_1 || NETCOREAPP3_1
+#if NETSTANDARD2_0 || NETSTANDARD2_1 || NETCOREAPP3_1 || NET6_0
 using Microsoft.Extensions.Options;
 #endif
 using Senparc.CO2NET;
-using Senparc.CO2NET.Cache;
-using Senparc.CO2NET.Extensions;
 using Senparc.CO2NET.Helpers;
 using Senparc.CO2NET.RegisterServices;
 using Senparc.Weixin.Cache;
 using Senparc.Weixin.Entities;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Senparc.Weixin
 {
@@ -170,8 +166,8 @@ namespace Senparc.Weixin
 
             /* 扩展缓存注册结束 */
 
-            //ApiBind 自动扫描
-            Senparc.NeuChar.Register.RegisterApiBind(false);
+            //注册 NeuChar
+            Senparc.NeuChar.Register.AddNeuChar();
 
             return registerService;
         }
@@ -198,7 +194,7 @@ namespace Senparc.Weixin
         }
 
         //从 v6.7.100 开始分离到 Senparc.Weixin.AspNet
-        //#if NETSTANDARD2_0 || NETSTANDARD2_1 || NETCOREAPP3_1
+        //#if NETSTANDARD2_0 || NETSTANDARD2_1 || NETCOREAPP3_1 || NET6_0
         //        /// <summary>
         //        /// <para>开始包含 CO2NET 注册在内的 Senparc.Weixin SDK 初始化参数流程</para>
         //        /// <para>注意：本方法集成了 CON2ET 全局注册以及 Senparc.Weixin SDK 微信注册过程，提供给对代码行数有极限追求的开发者使用，常规情况下为了提高代码可读性和可维护性，并不推荐使用此方法。</para>
@@ -215,7 +211,7 @@ namespace Senparc.Weixin
         //#endif
         //            SenparcSetting senparcSetting, SenparcWeixinSetting senparcWeixinSetting, Action<IRegisterService> globalRegisterConfigure, Action<IRegisterService> weixinRegisterConfigure,
         //             //CO2NET 全局设置
-        //             bool autoScanExtensionCacheStrategies = false, Func<IList<IDomainExtensionCacheStrategy>> extensionCacheStrategiesFunc = null
+        //             bool autoScanExtensionCacheStrategies = false, Func<List<IDomainExtensionCacheStrategy>> extensionCacheStrategiesFunc = null
         //            )
         //        {
         //            //注册 CO2NET 全局
